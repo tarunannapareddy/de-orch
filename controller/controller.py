@@ -26,8 +26,8 @@ def register_workflow():
     conn = connect_to_db()
     cur = conn.cursor()
 
-    cur.execute("INSERT INTO workflow_definition (name, task_id, user) VALUES (%s, %s, %s)", 
-                (workflow_name, task_id, username))
+    cur.execute("INSERT INTO workflow_definition (name, task_id, user_info) VALUES (%s, %s, %s)", 
+                (workflow_name, [task_id], username))
     
     conn.commit()
     cur.close()
@@ -54,8 +54,8 @@ def get_workflows():
             'workflow_id': workflow[0],
             'workflow_name': workflow[1],
             'task_id': workflow[2],
-            'username': workflow[3],
-            'timestamp': str(workflow[4])  # Convert timestamp to string for JSON serialization
+            'timestamp': str(workflow[3]),  # Convert timestamp to string for JSON serialization
+            'username': workflow[4]
         }
         workflows_list.append(workflow_dict)
 
@@ -71,7 +71,7 @@ def register_task():
     conn = connect_to_db()
     cur = conn.cursor()
 
-    cur.execute("INSERT INTO task_definition (name, user) VALUES (%s, %s);", 
+    cur.execute("INSERT INTO task_definition (name, user_info) VALUES (%s, %s);", 
                 (task_name, username))
     
     conn.commit()
@@ -98,8 +98,8 @@ def get_tasks():
         task_dict = {
             'task_id': task[0],
             'task_name': task[1],
-            'username': task[2],
-            'timestamp': str(task[3])  # Convert timestamp to string for JSON serialization
+            'timestamp': str(task[2]),  # Convert timestamp to string for JSON serialization
+            'username': task[3]
         }
         tasks_list.append(task_dict)
 
