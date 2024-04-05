@@ -115,5 +115,5 @@ def process_tasks():
                 worker_json = json.dumps(worker)
                 r.rpush('worker_queue',  worker_json)  
 
-pre_process_tasks()
+#pre_process_tasks()
 process_tasks()

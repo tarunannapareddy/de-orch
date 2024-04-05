@@ -15,6 +15,7 @@ sample_tasks = [
     {'workflow_name': 'IMAGE_PROCESSING', 'task_name': 'ROTATE_IMAGE', 'workflow_id': '1', 'task_id': '1', 'request': 'test.jpeg'}
 ]
 
+'''
 # Add sample tasks to the Redis list
 for task in sample_tasks:
     with open(task['request'], 'rb') as f:
@@ -23,7 +24,7 @@ for task in sample_tasks:
         task['request'] = image_base64
         task_json = json.dumps(task)
         r.rpush('worker_queue', task_json)
-
+'''
 
 # Create Threadpool for executing tasks
 executor = concurrent.futures.ThreadPoolExecutor()
@@ -33,12 +34,17 @@ def process_blur_image(image_data):
     with open('blur_image.jpg', 'wb') as f:
         f.write(image_data)
     print('Saved blur image')
+    return image_data
+
 
 def process_rotate_image(image_data):
     image_data = base64.b64decode(image_data)
     with open('rotate_image.jpg', 'wb') as f:
         f.write(image_data)
     print('Saved rotate image')
+    return image_data
+
+ #worker= {'workflow_exec_id': id ,'workflow_name': workflow_name, 'task_name': task_name, 'workflow_id': workflow_id, 'task_id': task_id, 'tasks_id': tasks_id, 'request': request}
 
 # Function to continuously process tasks from Redis
 def process_tasks():
@@ -51,13 +57,21 @@ def process_tasks():
         task_id = task_dict['task_id']
         workflow_name = task_dict['workflow_name']
         workflow_id = task_dict['workflow_id']
-        print('Received task', task_name, task_id, 'from workflow', workflow_name, workflow_id)
+        workflow_exec_id = task_dict['workflow_exec_id']
+        tasks_id = task_dict['tasks_id']
+        print('Received task', task_name, task_id, 'from workflow', workflow_name, workflow_id, workflow_exec_id)
 
         if task_name == 'BLUR_IMAGE':
-            executor.submit(process_blur_image, request)
+            future = executor.submit(process_blur_image, request)
         elif task_name == 'ROTATE_IMAGE':
-            executor.submit(process_rotate_image, request)
+            future = executor.submit(process_rotate_image, request)
         else:
             print("Unknown task type:", task_name)
+        print('got result')
+        result = future.result() 
+        print('got result', result)
+        data = {'worker':{'data': 'worker', 'workflow_exec_id': workflow_exec_id ,'workflow_name': workflow_name, 'task_name': task_name, 'workflow_id': workflow_id, 'task_id': task_id, 'tasks_id': tasks_id, 'request': base64.b64encode(result).decode('utf-8')}}
+        worker_json = json.dumps(data)
+        r.rpush('scheduler_queue', worker_json)  
 
 process_tasks()
