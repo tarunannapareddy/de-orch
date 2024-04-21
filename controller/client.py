@@ -13,24 +13,31 @@ def process_image(path_img):
         return image_base64
 
 # Get image data
-path = r'H:\MS\Sem 2\DS_project\de-orch\worker\test.jpeg'
+path = 'test.jpeg'
 image = process_image(path)
 
 # Sample data for workflow and task registration
 workflow_data = {
-    'workflow_name': 'Sample Workflow',
-    'task_id': [1,2],
+    'workflow_name': 'Image Workflow',
+    'task_id': [3,4],
     'username': 'user1'
 }
 
 task_data = {
-    'task_name': 'Sample Task',
+    'task_name': 'BLUR_IMAGE',
+    'username': 'user1'
+}
+
+task_data2 = {
+    'task_name': 'ROTATE_IMAGE',
     'username': 'user1'
 }
 
 exec_data = {
-    'workflow_id': 3,
-    'request': image
+    'workflow_id': 4,
+    'request': {
+        'image' : image
+    }
 }
 
 # Function to register a workflow
@@ -46,6 +53,8 @@ def get_workflows():
 # Function to register a task
 def register_task():
     response = requests.post(f'{SERVER_URL}/register_task', json=task_data)
+    print(response.json())
+    response = requests.post(f'{SERVER_URL}/register_task', json=task_data2)
     print(response.json())
 
 # Function to get all tasks

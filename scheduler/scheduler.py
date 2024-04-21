@@ -2,6 +2,10 @@ import redis
 import psycopg2
 import json
 import base64
+import time
+
+# Global variable to store the last push time
+last_push_time = None
 
 # Connect to Redis
 redis_host = 'localhost'
@@ -15,16 +19,16 @@ try:
 except redis.exceptions.ConnectionError:
     print("Error: Failed to connect to Redis")
 
-
 conn = psycopg2.connect(
-        dbname="postgres",
-        user="postgresuser",
-        password="postgres",
-        host="35.230.178.196",
-        port="5432"
-    )
+    dbname="postgres",
+    user="postgresuser",
+    password="postgres",
+    host="35.230.178.196",
+    port="5432"
+)
 
 def pre_process_tasks():
+    global last_push_time  # Access the global variable
     with open("test.jpeg", 'rb') as f:
         image_data = f.read()
         image_base64 = base64.b64encode(image_data).decode('utf-8')
@@ -32,28 +36,32 @@ def pre_process_tasks():
     data = {'worker':{'workflow_exec_id': "3" ,'workflow_name': "Sample Workflow", 'task_name': "Sample Task", 'workflow_id': "3", 'task_id': "2", 'tasks_id': [1,2], 'request': request}}
     # Serialize the dictionary into a JSON string
     data_json = json.dumps(data)
-    r.rpush('scheduler_queue',  data_json)   
+    r.rpush('scheduler_queue',  data_json)
+    last_push_time = time.time()  # Update the last push time
 
 # Function to continuously process tasks from Redis
 def process_tasks():
+    global last_push_time 
     while True:
         task_object = r.blpop('scheduler_queue', timeout=0)
         key, task_json = task_object
         # Parse the JSON string back into a dictionary
         data = json.loads(task_json)
+        
+        # Calculate and print time difference if last_push_time is not None
+        if last_push_time is not None:
+            current_time = time.time()
+            time_difference = current_time - last_push_time
+            print("processing time is :", time_difference, "event is", data)
+        
         if "controller" in data:
             print("task",data["controller"])
             wf= data["controller"]
             id= wf["workflow_exe_id"]
             print("id",id)
             cur = conn.cursor()
-
-            cur.execute("SELECT * FROM workflow_execution where id=%s",id)
+            cur.execute("SELECT * FROM workflow_execution where id=%s",(id,))
             workflows_e = cur.fetchall()
-            
-            #{'workflow_name': 'IMAGE_PROCESSING', 'task_name': 'BLUR_IMAGE', 'workflow_id': '1', 'task_id': '1', 'request': 'test.jpeg'}
-            # Convert workflows to a list of dictionaries for JSON serialization
-            
             for workflow in workflows_e:
                 id=workflow[0]
                 workflow_id=str(workflow[1])
@@ -61,13 +69,13 @@ def process_tasks():
                 request=workflow[3]
                 print("wf=",workflow_id,task_id)
             
-            cur.execute("SELECT * FROM workflow_definition where id=%s",workflow_id)
+            cur.execute("SELECT * FROM workflow_definition where id=%s",(workflow_id,))
             workflows_d = cur.fetchall()
             for workflow in workflows_d:
                 workflow_name=workflow[1]
                 tasks_id=workflow[2]
             print(tasks_id)
-            cur.execute("SELECT * FROM task_definition where id=%s",task_id)
+            cur.execute("SELECT * FROM task_definition where id=%s",(task_id,))
             task_d = cur.fetchall()
             for task in task_d:
                 task_name=task[1]
@@ -75,6 +83,7 @@ def process_tasks():
             print(task_name)
             worker= {'workflow_exec_id': id ,'workflow_name': workflow_name, 'task_name': task_name, 'workflow_id': workflow_id, 'task_id': task_id, 'tasks_id': tasks_id, 'request': request}
             worker_json = json.dumps(worker)
+            last_push_time = time.time()
             r.rpush('worker_queue',  worker_json)  
 
         if "worker" in data:
@@ -105,7 +114,7 @@ def process_tasks():
                 for task in task_d:
                     task_name=task[1]
                 
-                cur.execute("UPDATE workflow_execution SET next_task_id = %s, request = %s, status= 'INPROGRESS' WHERE id = %s", (str(task_id), request, workflow_exec_id))
+                cur.execute("UPDATE workflow_execution SET next_task_id = %s, request = %s, status= 'INPROGRESS' WHERE id = %s", (str(task_id), json.dumps(request), workflow_exec_id))
     
                 # Commit the transaction
                 conn.commit()
@@ -113,6 +122,7 @@ def process_tasks():
 
                 worker= {'workflow_exec_id': workflow_exec_id ,'workflow_name': workflow_name, 'task_name': task_name, 'workflow_id': workflow_id, 'task_id': task_id, 'tasks_id': tasks_id, 'request': request}
                 worker_json = json.dumps(worker)
+                last_push_time = time.time()
                 r.rpush('worker_queue',  worker_json)  
 
 #pre_process_tasks()
