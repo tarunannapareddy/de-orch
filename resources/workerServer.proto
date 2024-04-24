@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+service Worker {
+   rpc migrate (MigrationInput) returns (MigrationOutput) {}
+   rpc storeDate(StoreDataInput) returns (StoreDataOutput) {}
+}
+
+message MigrationInput {
+   string ip = 1;
+   string port = 2;
+   string id = 3;
+}
+
+message MigrationOutput {
+   bool status = 1;
+}
+
+
+message StoreDataInput{
+   string id =1;
+   bytes image_data = 2;
+}
+
+message StoreDataOutput {
+   bool status = 1;
+}
