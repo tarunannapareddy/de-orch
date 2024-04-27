@@ -3,12 +3,17 @@ import psycopg2
 import json
 import base64
 import time
+import openpyxl
 
 # Global variable to store the last push time
 last_push_time = None
 
+workbook = openpyxl.Workbook()
+sheet = workbook.active
+sheet.append(["Time"])
+
 # Connect to Redis
-redis_host = 'localhost'
+redis_host = '127.0.0.1'
 redis_port = 6379
 redis_db = 0
 r = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
@@ -53,6 +58,8 @@ def process_tasks():
             current_time = time.time()
             time_difference = current_time - last_push_time
             print("processing time is :", time_difference, "event is", data)
+            sheet.append([time_difference])
+            workbook.save("processing_times.xlsx")
         
         if "controller" in data:
             print("task",data["controller"])

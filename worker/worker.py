@@ -27,7 +27,7 @@ data_map = {}
 # Create Threadpool for executing tasks
 executor = concurrent.futures.ThreadPoolExecutor()
 
-def process_blur_image(request):
+def process_image(request, p, type):
     image = request.get('image')
     memId = request.get('memId')
     if image:
@@ -37,33 +37,17 @@ def process_blur_image(request):
         if not image_data:
             print(f"Image data for ID {memId} not found.")
             return None
-    with open(f'blur_image_{memId}.jpg', 'wb') as f:
+    with open(f'{p}_{memId}.jpg', 'wb') as f:
         f.write(image_data)
+    if type == 'REGULAR':
+        return {'image' : base64.b64encode(image_data).decode('utf-8')}
     result_id = str(uuid.uuid4())
     data_map[result_id] = image_data
-    print(f'stored result :{result_id}')
-    return result_id
+    print(f'stored result :{result_id} for {p}')
+    return {'memId' : result_id}
 
-def process_rotate_image(request):
-    image = request.get('image')
-    memId = request.get('memId')
-    if image:
-        image_data = base64.b64decode(image)
-    else:
-        image_data = data_map.pop(memId,None)
-        if not image_data:
-            print(f"Image data for ID {memId} not found.")
-            return None
-    with open(f'rotate_image_{memId}.jpg', 'wb') as f:
-        f.write(image_data)
-    result_id = str(uuid.uuid4())
-    data_map[result_id] = image_data
-    print(f'stored result :{result_id}')
-    return result_id
-
-def process_tasks(queue):
-    print(f'reading fom queue {queue}')
-
+def process_tasks(queue, type):
+    print(f'reading fom queue {queue} in mode {type}')
     while True:
         task_object = r.blpop(queue, timeout=0)
         _, task_json = task_object
@@ -76,13 +60,8 @@ def process_tasks(queue):
         workflow_exec_id = task_dict['workflow_exec_id']
         tasks_id = task_dict['tasks_id']
         print('Received task', task_name, task_id, 'from workflow', workflow_name, workflow_id, workflow_exec_id)
-        result_data = None
-        if task_name == 'BLUR_IMAGE':
-            result_data = process_blur_image(request)
-        elif task_name == 'ROTATE_IMAGE':
-            result_data = process_rotate_image(request)
-        else:
-            print("Unknown task type:", task_name)
+        result_data = process_image(request, task_name, type)
+
         if result_data:
             data = {
                 'worker': {
@@ -93,9 +72,7 @@ def process_tasks(queue):
                     'workflow_id': workflow_id,
                     'task_id': task_id,
                     'tasks_id': tasks_id,
-                    'request': {
-                        'memId': result_data
-                    }
+                    'request': result_data
                 }
             }
             worker_json = json.dumps(data)
@@ -117,7 +94,6 @@ class WorkerServerServicer(workerServer_pb2_grpc.WorkerServicer):
     
     def storeDate(self, request, context):
         data_map[request.id] = request.image_data
-        process_rotate_image({'memId': request.id})
         return workerServer_pb2.StoreDataOutput(status= True)
 
 def serve(port):
@@ -143,13 +119,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--port', type=int, default=50052, help='Port number for the gRPC server')
     parser.add_argument('-q', '--queue', type=str, default='worker_queue', help='Redis queue name')
-    parser.add_argument('-c', '--pool', type=int, default=2, help='Worker pool count')
+    parser.add_argument('-c', '--pool', type=int, default=1, help='Worker pool count')
+    parser.add_argument('-t', '--type', type=str, default='REGULAR', help='Type of worker REGULAR/SHARED')
     args = parser.parse_args()
 
-    register_worker('localhost', args.port, args.queue, args.pool)
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=args.pool_count)
+    #register_worker('localhost', args.port, args.queue, args.pool)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=args.pool)
     for _ in range(args.pool):
-        executor.submit(process_tasks, args.queue)
+        executor.submit(process_tasks, args.queue, args.type)
     serve_thread = threading.Thread(target=serve, args=(args.port,))
     serve_thread.start()
     serve_thread.join()
