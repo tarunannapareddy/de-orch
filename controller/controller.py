@@ -191,5 +191,25 @@ def get_exec():
 
     return jsonify(tasks_list), 200
 
+@app.route('/register_worker', methods=['POST'])
+def reg_worker():
+    data = request.json
+    worker_ip = data.get('ip')
+    worker_port = data.get('port')
+    queue_name = data.get('queue_name')
+    pool_count = data.get('pool_count')
+
+    conn = connect_to_db()
+    cur = conn.cursor()
+
+    cur.execute("INSERT INTO workers (ip, port, queue_name, pool_count) VALUES (%s, %s, %s, %s)", 
+                (worker_ip, worker_port, queue_name, pool_count))
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({"message": "Worker registered successfully"}), 201
+
 if __name__ == '__main__':
     app.run(debug=True)

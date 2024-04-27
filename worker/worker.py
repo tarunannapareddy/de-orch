@@ -153,5 +153,3 @@ if __name__ == '__main__':
     serve_thread = threading.Thread(target=serve, args=(args.port,))
     serve_thread.start()
     serve_thread.join()
-    
-
