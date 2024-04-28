@@ -34,7 +34,7 @@ task_data2 = {
 }
 
 exec_data = {
-    'workflow_id': 4,
+    'workflow_id': 6,
     'request': {
         'image' : image
     }

@@ -59,6 +59,7 @@ def process_tasks(queue, type):
         workflow_id = task_dict['workflow_id']
         workflow_exec_id = task_dict['workflow_exec_id']
         tasks_id = task_dict['tasks_id']
+        worker_id=task_dict['worker_id']
         print('Received task', task_name, task_id, 'from workflow', workflow_name, workflow_id, workflow_exec_id)
         result_data = process_image(request, task_name, type)
 
@@ -72,7 +73,8 @@ def process_tasks(queue, type):
                     'workflow_id': workflow_id,
                     'task_id': task_id,
                     'tasks_id': tasks_id,
-                    'request': result_data
+                    'request': result_data,
+                    'worker_id':worker_id
                 }
             }
             worker_json = json.dumps(data)
@@ -123,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--type', type=str, default='REGULAR', help='Type of worker REGULAR/SHARED')
     args = parser.parse_args()
 
-    #register_worker('localhost', args.port, args.queue, args.pool)
+    register_worker('localhost', args.port, args.queue, args.pool)
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=args.pool)
     for _ in range(args.pool):
         executor.submit(process_tasks, args.queue, args.type)
